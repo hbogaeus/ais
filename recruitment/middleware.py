@@ -27,7 +27,7 @@ class LoginRequiredMiddleware:
         # TODO: not hardcode fairs/2017/banquet/signup and fairs/2018/banquet/signup
         url_exceptions = {
             '/',
-            '/register/', '/register/signup', '/register/new_company',
+            '/register/', '/register/batcavepleaseattackme', '/register/signup', '/register/new_company',
             '/register/password_reset/', '/register/password_reset/done/',
             '/register/external/signup',
             '/fairs/2017/banquet/signup', '/fairs/2018/banquet/signup'
