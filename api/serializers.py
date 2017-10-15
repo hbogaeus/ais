@@ -84,10 +84,11 @@ def event(request, event):
     tags = tags_mappings(event.tags.all())
     signup_link = event.external_signup_url if event.external_signup_url else absolute_url(request, '/fairs/2017/events/' + str(
         event.pk) + '/signup')
+    print(event.image)
     return OrderedDict([
                            ('id', event.pk),
                            ('name', event.name),
-                           ('image_url', image_url_or_missing(request, event.image)),
+                           ('image_url', image_url_or_missing(request, event.image_original)),
                            ('location', event.location),
                            ('description_short', event.description_short),
                            ('description', event.description),
@@ -126,7 +127,7 @@ def person(request, person):
     return OrderedDict([
         ('id', person.pk),
         ('name', person.get_full_name()),
-        ('picture', image_url_or_missing(request, person.profile.picture, MISSING_PERSON)),
+        ('picture', image_url_or_missing(request, person.profile.picture_original, MISSING_PERSON)),
     ])
 
 
@@ -139,13 +140,17 @@ def organization_group(request, group):
     ])
 
 
-def banquet_placement(request, attendence, index):
+def banquet_placement(request, attendence):
+    try:
+      table = attendence.table.name
+    except AttributeError: 
+      table = None
     return OrderedDict([
         ('id', attendence.pk),
         ('first_name', attendence.first_name),
         ('last_name', attendence.last_name),
         ('linkedin_url', attendence.linkedin_url or ""),
-        ('table', attendence.table_name or ""),
+        ('table', table or ""),
         ('seat', attendence.seat_number or ""),
         ('job_title', attendence.job_title)
     ])
