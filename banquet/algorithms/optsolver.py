@@ -44,9 +44,9 @@ class StudentAttendant(Attendant):
         self.gender = gender
 
 class ExhibitorAttendant(Attendant):
-    def __init__(self, id, interest_ids = [], gender = 2):
+    def __init__(self, id, programme_id = [], gender = 2):
         self.id = id
-        self.interest_ids = interest_ids
+        self.programme_id = programme_id
         self.gender = gender
 
 class StaticStudent(Attendant):
@@ -76,6 +76,13 @@ class Table(object):
     def __str__(self):
         table = BanquetTable.objects.get(pk=self.id)
         return '%s'%table.table_name
+
+class Interest(object):
+    def __init__(self, id):
+        self.id = id
+
+    def __str__(self):
+        return Programme.objects.get(self.id)
 
 def process_attendants(fair):
     '''
@@ -111,10 +118,11 @@ Attendant
     for s in students_all:
         programme_id = None
         try:
-            user = user.objects.get(pk=s.user.pk)
+            user = User.objects.get(pk=s.user.pk)
             user_profile = Profile.objects.get(user=user)
             if user_profile.programme:
                 programme_id = user_profile.programme.pk
+                print(programme_id)
             else:
                 pass
         except:
@@ -130,6 +138,7 @@ Attendant
 
 def gen_new_tables(fair, number_of_attendants, size_of_table=8):
     '''
+    returns a list ob Table objects of all tables in ais and new ones
     '''
     nr_of_tables = math.ceil(float(number_of_attendants) / float(size_of_table))
     table_numbers = list(np.arange(1,nr_of_tables+1))
@@ -149,11 +158,38 @@ def gen_new_tables(fair, number_of_attendants, size_of_table=8):
 
     return tables_all
 
+def gen_interest_matrix(rowobjs, colobjs, row_dict, col_dict, offset=0):
+    '''
+    generates the interest matrices for students and exhibitors
+    '''
+    matrix = np.zeros((len(rowobjs), len(colobjs)))
+    for i, c in enumerate(colobjs):
+        if c.programme_id:
+            if type(c.programme_id) == list:
+                for interest_id in c.programme_id:
+                    matrix[row_dict[interest_id]][col_dict[c.id]-offset] = 1
+            else:
+                matrix[row_dict[c.programme_id]][col_dict[c.id]-offset] = 1
+    return(matrix)
+
+def gen_static_matrix(rowobjs, colobjs, row_dict, col_dict, offset=0):
+    '''
+    generates the static matrices for students and exhibitors
+    '''
+    matrix = np.zeros((len(row_dict.values()), len(col_dict.values())))
+    for i, c in enumerate(colobjs):
+        if c.table_id:
+            matrix[row_dict[c.table_id]][col_dict[c.id]-offset] = 1
+    return(matrix)
+
 def main_process(fair):
     '''
     '''
     (exhibitors, students, exhibitors_static, students_static, tot_length) = process_attendants(fair)
-    initial_tables = gen_new_tables(fair, tot_length, 8)
+    tables = gen_new_tables(fair, tot_length, 8)
+    tables_keys = [t.id for t in tables]
+    tables_vals = list(np.arange(len(tables_keys)))
+    table_idx_dict = dict(zip(tables_keys, tables_vals))
 
     # put statics last in lists
     for i in range(len(exhibitors)):
@@ -173,6 +209,21 @@ def main_process(fair):
 
     exhibitor_idx_dict = dict(zip(exhibitors_keys, exhibitors_vals))
     student_idx_dict = dict(zip(students_keys, students_vals))
+
+    interests = [Interest(p.pk) for p in Programme.objects.all()]
+    interests_vals = list(np.arange(len(interests)))
+    interests_keys = [i.id for i in interests]
+    interest_idx_dict = dict(zip(interests_keys, interests_vals))
+
+    ex_interest_mat = gen_interest_matrix(interests, exhibitors, interest_idx_dict, exhibitor_idx_dict)
+    stud_interest_mat = gen_interest_matrix(interests, students, interest_idx_dict, student_idx_dict, len(exhibitors))
+
+    ex_static_mat = gen_static_matrix(tables, exhibitors_static, table_idx_dict, exhibitor_idx_dict)
+    stud_static_mat = gen_static_matrix(tables, students_static, table_idx_dict, student_idx_dict, len(exhibitors))
+
+    print(stud_static_mat.sum(axis=1))
+
+
 
 def solver(fair):
     '''
