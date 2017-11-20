@@ -10,8 +10,8 @@ from register.views import external_signup
 from django.contrib.auth.models import User
 from django.contrib.auth.decorators import permission_required
 from django.core.exceptions import PermissionDenied
-import banquet.functions as func
-
+#import banquet.functions as func
+from banquet.algorithms import optsolver as opt
 
 def sit_attendants(request, year):
     '''
@@ -19,7 +19,8 @@ def sit_attendants(request, year):
     Will call a function and redirect back to the banquet.
     '''
     if request.user.has_perm('banquet.can_seat_attendants'):
-        func.sit_attendants()
+        fair = get_object_or_404(Fair, year=year)
+        opt.solver(fair)
         return HttpResponseRedirect(reverse('banquet', kwargs={'year': year }))
     else:
         return HttpResponseForbidden()
@@ -125,7 +126,7 @@ def new_banquet_attendant(request, year, template_name='banquet/banquet_attendan
 
     else:
         return HttpResponseForbidden()
-      
+
 
 def table_placement(request, year, template_name='banquet/table_placement.html'):
     """
@@ -151,7 +152,7 @@ def table_placement(request, year, template_name='banquet/table_placement.html')
         return render(request, template_name, {'fair': fair, 'banquet_attendant': banquet_attendant, 'table_name': table_name, 'table_mates': table_mates, 'confirmed': banquet_attendant.confirmed })
     # not authenticated
     return redirect('/fairs/' + year + '/banquet/signup')
-  
+
 
 def banquet_external_signup(request, year, template_name='banquet/external_signup.html'):
     """

@@ -20,6 +20,10 @@ from exhibitors.models import Exhibitor
 from people.models import Programme, Profile
 from banquet.models import BanquetTable, BanquetTicket, BanquetteAttendant
 
+import numpy as np
+import cvxopt
+from cvxopt import glpk
+
 # The following models are only used locally for the solver
 class Attendant(object):
     def __str__(self):
@@ -59,7 +63,7 @@ class Table(object):
             self.free_seats -= 1
 
     def __str__(self):
-        table = BanquetTable.objects.get(self.id)
+        table = BanquetTable.objects.get(pk=self.id)
         return '%s'%table.table_name
 
 def process_attendants(fair):
@@ -103,8 +107,9 @@ def process_attendants(fair):
                 else:
                     slacks.append(SlackAttendant(ne.pk))
             except Exception as e:
-                print(str(e))
+                #print(str(e))
                 slacks.append(SlackAttendant(ne.pk))
+
     tot_length = len(exhibitors) + len(students) + len(statics) + len(slacks)
     print('Processing of attendants = %s (#=%i) '%(str(tot_length == len(attendants_all)),len(attendants_all)))
     return( exhibitors, students, statics, slacks, tot_length )
@@ -123,7 +128,10 @@ def process_tables(fair, exhibitors, statics, number_of_attendants):
                         t.put_static(s)
                         break
     except TypeError as e:
-        raise Exception('There is probably some Nonetype in the tables!')
+        raise Exception('Some Table probably does not have the number_of_seats defined!\nError: %s'%str(e))
+
+    #for static_attendant in statics:
+    #    if static_attendant.
 
     return tables
 
@@ -133,16 +141,15 @@ def main_process(fair):
     '''
     (exhibitors, students, statics, slacks, tot_length) = process_attendants(fair)
     initial_tables = process_tables(fair, exhibitors, statics, tot_length)
-    for it in initial_tables:
-        print(it)
-        print(it.number_of_seats)
-        print(it.free_seats)
-        print('_____________')
+    partitioned_attendants = [exhibitors + students + statics + slacks]
+    partitioned_keys = [p.id for p in partitioned_attendants]
+    print(len(partitioned_keys))
+    #attendant_dict = dict(zip())
 
 def solver(fair):
     '''
     '''
     main_process(fair)
 
-fair = Fair.objects.get(current=True)
-solver(fair)
+#fair = Fair.objects.get(current=True)
+#solver(fair)
