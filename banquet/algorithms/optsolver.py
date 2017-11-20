@@ -20,7 +20,9 @@ from exhibitors.models import Exhibitor
 from people.models import Programme, Profile
 from banquet.models import BanquetTable, BanquetTicket, BanquetteAttendant
 
+from pprint import pprint
 import math
+from collections import Counter
 import numpy as np
 import cvxopt
 from cvxopt import glpk
@@ -199,6 +201,24 @@ def gen_gender_parameter(exhibitors, students, ex_dict, stud_dict):
 
     return vector
 
+def move_statics(exhibitors, exhibitors_static):
+    idx_to_move = []
+    for i,e in enumerate(exhibitors):
+        for es in exhibitors_static:
+            if es.id == e.id:
+                idx_to_move.append(i)
+
+    obj_to_move = []
+    for idx in idx_to_move:
+        obj_to_move.append(exhibitors[idx])
+    print(len(obj_to_move))
+    for idx in list(reversed(idx_to_move)):
+        exhibitors.pop(idx)
+    exhibitors += obj_to_move
+    print(len(exhibitors))
+
+    return(exhibitors)
+
 def main_process(fair):
     '''
     '''
@@ -208,15 +228,8 @@ def main_process(fair):
     tables_vals = list(np.arange(len(tables_keys)))
     table_idx_dict = dict(zip(tables_keys, tables_vals))
 
-    # put statics last in lists
-    for i in range(len(exhibitors)):
-        if exhibitors[i].id in [e.id for e in exhibitors_static]:
-            ex_to_move = exhibitors.pop(i)
-            exhibitors.append(ex_to_move)
-    for i in range(len(students)):
-        if students[i].id in [s.id for s in students_static]:
-            stud_to_move = students.pop(i)
-            students.append(stud_to_move)
+    exhibitors = move_statics(exhibitors, exhibitors_static)
+    students = move_statics(students, students_static)
 
     ex_len = len(exhibitors)
     exhibitors_keys = [e.id for e in exhibitors]
@@ -239,25 +252,29 @@ def main_process(fair):
     stud_static_mat = gen_static_matrix(tables, students_static, table_idx_dict, student_idx_dict, len(exhibitors))
 
     gender_array = gen_gender_parameter(exhibitors, students, exhibitor_idx_dict, student_idx_dict)
+    print(ex_static_mat.sum(axis=1))
+
+    return ( exhibitors, students, exhibitors_static, students_static, interests, tables, exhibitor_idx_dict, student_idx_dict, interest_idx_dict, table_idx_dict, ex_interest_mat, stud_interest_mat, ex_static_mat, stud_static_mat, gender_array )
 
 def solver(fair):
     '''
     '''
-    main_process(fair)
-    #outfile_path = 'banquet/algorithms/test.gms'
-    #eqnfile_path = 'banquet/algorithms/opt_eqn_banquet.gms'
-    '''
+    ( exhibitors, students, exhibitors_static, students_static, interests, tables, exhibitor_idx_dict, student_idx_dict, interest_idx_dict, table_idx_dict, ex_interest_mat, stud_interest_mat, ex_static_mat, stud_static_mat, gender_array ) = main_process(fair)
+
+    outfile_path = 'banquet/algorithms/test.gms'
+    eqnfile_path = 'banquet/algorithms/opt_eqn_banquet.gms'
     with open(outfile_path, 'w+') as FILE:
-        tot_attendants = 10
-        tot_tables = 5
-        tot_interests = 5
-        exhibitors_idx = [1,5]
-        students_idx = [6,10]
-        static_ex = [3,5]
-        static_stud = [8,10]
+        tot_attendants = len(exhibitors) + len(students) -1
+        tot_tables = len(tables) -1
+        tot_interests = len(interests) - 1
+        exhibitors_idx = [min(exhibitor_idx_dict.values()),max(exhibitor_idx_dict.values())]
+        students_idx = [min(student_idx_dict.values()),max(student_idx_dict.values())]
+        ex_static_indices = [exhibitor_idx_dict[e.id] for e in exhibitors_static]
+        stud_static_indices = [student_idx_dict[s.id] for s in students_static]
+        static_ex = [min(ex_static_indices),max(ex_static_indices)]
+        static_stud = [min(stud_static_indices),max(stud_static_indices)]
         gen.gen_init_strings(FILE, tot_attendants, tot_tables, tot_interests, exhibitors_idx, students_idx, static_ex, static_stud)
         gen.gen_gams_eqns(FILE, eqnfile_path)
-    '''
 
 
 
