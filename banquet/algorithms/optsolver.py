@@ -20,33 +20,44 @@ from exhibitors.models import Exhibitor
 from people.models import Programme, Profile
 from banquet.models import BanquetTable, BanquetTicket, BanquetteAttendant
 
+import math
 import numpy as np
 import cvxopt
 from cvxopt import glpk
 
+from . import gams_generator as gen
+
 # The following models are only used locally for the solver
 class Attendant(object):
+
+    def get_attendant(self):
+        return BanquetteAttendant.objects.get(pk=self.id)
+
     def __str__(self):
         attendant = BanquetteAttendant.objects.get(pk=self.id)
         return '%i : %s %s'%(self.id, attendant.first_name, attendant.last_name)
 
 class StudentAttendant(Attendant):
-    def __init__(self, id, programme_id):
+    def __init__(self, id, programme_id, gender=2):
         self.id = id
         self.programme_id = programme_id
+        self.gender = gender
 
 class ExhibitorAttendant(Attendant):
-    def __init__(self, id, interest_ids = []):
+    def __init__(self, id, interest_ids = [], gender = 2):
         self.id = id
         self.interest_ids = interest_ids
+        self.gender = gender
 
-class SlackAttendant(Attendant):
-    def __init__(self, id):
+class StaticStudent(Attendant):
+    def __init__(self, id, table_id):
         self.id = id
+        self.table_id = table_id
 
-class StaticAttendant(Attendant):
-    def __init__(self, id):
+class StaticExhibitor(Attendant):
+    def __init__(self, id, table_id):
         self.id = id
+        self.table_id = table_id
 
 class Table(object):
     def __init__(self, id, number_of_seats):
@@ -55,7 +66,7 @@ class Table(object):
         self.free_seats = number_of_seats
         self.seated = []
 
-    def put_static(self, attendant):
+    def put(self, attendant):
         if self.free_seats == 0:
             raise ValueError('Your table is full!')
         else:
@@ -69,7 +80,7 @@ class Table(object):
 def process_attendants(fair):
     '''
     will return lists of objects for the different types of attendants
-
+Attendant
     students - students which has a programme connected to them and are not ignored from placement
 
     exhibitors - exhibitors which are not ignored from placement
@@ -79,77 +90,110 @@ def process_attendants(fair):
     slacks - any user that is not an exhibitor, not ignored from placement and does not have any kth programme connected to them
     '''
     students = []
-    statics = []
-    slacks = []
+    students_static = []
     exhibitors = []
+    exhibitors_static = []
 
     ticket_types = BanquetTicket.objects.all()
     attendants_all = BanquetteAttendant.objects.filter(fair=fair)
 
     exhibitors_all = [a for a in attendants_all if a.exhibitor]
     for e in exhibitors_all:
-        interets = []
+        interests = []
         if e.exhibitor.company.related_programme.all():
             interests = [programme.pk for programme in e.exhibitor.company.related_programme.all()]
+
         exhibitors.append(ExhibitorAttendant(e.pk, interests))
+        if e.ignore_from_placement:
+            exhibitors_static.append(StaticExhibitor(e.pk, e.table.pk))
 
-    not_exhibitors = [a for a in attendants_all if not a.exhibitor]
+    students_all = [a for a in attendants_all if not a.exhibitor]
+    for s in students_all:
+        programme_id = None
+        try:
+            user = user.objects.get(pk=s.user.pk)
+            user_profile = Profile.objects.get(user=user)
+            if user_profile.programme:
+                programme_id = user_profile.programme.pk
+            else:
+                pass
+        except:
+            pass
 
-    for ne in not_exhibitors:
-        if ne.ignore_from_placement:
-            statics.append(StaticAttendant(ne.pk))
-        else:
-            try:
-                user = User.objects.get(pk=ne.user.pk)
-                user_profile = Profile.objects.get(user=user)
-                if user_profile.programme:
-                    students.append(StudentAttendant(ne.pk, user_profile.programme.pk))
-                else:
-                    slacks.append(SlackAttendant(ne.pk))
-            except Exception as e:
-                #print(str(e))
-                slacks.append(SlackAttendant(ne.pk))
+        students.append(StudentAttendant(s.pk, programme_id))
+        if s.ignore_from_placement:
+            students_static.append(StaticStudent(s.pk, s.table.pk))
 
-    tot_length = len(exhibitors) + len(students) + len(statics) + len(slacks)
-    print('Processing of attendants = %s (#=%i) '%(str(tot_length == len(attendants_all)),len(attendants_all)))
-    return( exhibitors, students, statics, slacks, tot_length )
+    tot_length = len(students) + len(exhibitors)
+    print('Processing of attendants = %s (#=%i), static exhibitors = %i, static students+rest = %i '%(str(tot_length == len(attendants_all)),len(attendants_all), len(exhibitors_static), len(students_static)))
+    return( exhibitors, students, exhibitors_static, students_static, tot_length)
 
-def process_tables(fair, exhibitors, statics, number_of_attendants):
+def gen_new_tables(fair, number_of_attendants, size_of_table=8):
     '''
     '''
-    tables_all = BanquetTable.objects.filter(fair=fair)
-    tables = [Table(t.pk, t.number_of_seats) for t in tables_all]
-    try:
-        for s in statics:
-            s = BanquetteAttendant.objects.get(pk=s.id)
-            if s.table:
-                for t in tables:
-                    if s.table.pk == t.id:
-                        t.put_static(s)
-                        break
-    except TypeError as e:
-        raise Exception('Some Table probably does not have the number_of_seats defined!\nError: %s'%str(e))
+    nr_of_tables = math.ceil(float(number_of_attendants) / float(size_of_table))
+    table_numbers = list(np.arange(1,nr_of_tables+1))
+    tables_current = BanquetTable.objects.filter(fair=fair)
+    current_table_numbers = [int(t.table_name.split(';')[0]) for t in tables_current]
+    tables_all = []
+    for t in tables_current:
+        tables_all.append(Table(t.pk, size_of_table))
 
-    #for static_attendant in statics:
-    #    if static_attendant.
+    new_table_numbers = [val for val in table_numbers if val not in current_table_numbers]
+    for val in new_table_numbers:
+        table = BanquetTable.objects.create(
+            fair = fair,
+            table_name = '%i; Banquet table (autogenerated table!)'%val,
+            number_of_seats = size_of_table )
+        tables_all.append(Table(table.pk, size_of_table))
 
-    return tables
-
+    return tables_all
 
 def main_process(fair):
     '''
     '''
-    (exhibitors, students, statics, slacks, tot_length) = process_attendants(fair)
-    initial_tables = process_tables(fair, exhibitors, statics, tot_length)
-    partitioned_attendants = [exhibitors + students + statics + slacks]
-    partitioned_keys = [p.id for p in partitioned_attendants]
-    print(len(partitioned_keys))
-    #attendant_dict = dict(zip())
+    (exhibitors, students, exhibitors_static, students_static, tot_length) = process_attendants(fair)
+    initial_tables = gen_new_tables(fair, tot_length, 8)
+
+    # put statics last in lists
+    for i in range(len(exhibitors)):
+        if exhibitors[i].id in [e.id for e in exhibitors_static]:
+            ex_to_move = exhibitors.pop(i)
+            exhibitors.append(ex_to_move)
+    for i in range(len(students)):
+        if students[i].id in [s.id for s in students_static]:
+            stud_to_move = students.pop(i)
+            students.append(stud_to_move)
+
+    ex_len = len(exhibitors)
+    exhibitors_keys = [e.id for e in exhibitors]
+    students_keys = [s.id for s in students]
+    exhibitors_vals = list(np.arange(ex_len))
+    students_vals = list(np.arange(ex_len, ex_len+len(students)))
+
+    exhibitor_idx_dict = dict(zip(exhibitors_keys, exhibitors_vals))
+    student_idx_dict = dict(zip(students_keys, students_vals))
 
 def solver(fair):
     '''
     '''
     main_process(fair)
+    #outfile_path = 'banquet/algorithms/test.gms'
+    #eqnfile_path = 'banquet/algorithms/opt_eqn_banquet.gms'
+    '''
+    with open(outfile_path, 'w+') as FILE:
+        tot_attendants = 10
+        tot_tables = 5
+        tot_interests = 5
+        exhibitors_idx = [1,5]
+        students_idx = [6,10]
+        static_ex = [3,5]
+        static_stud = [8,10]
+        gen.gen_init_strings(FILE, tot_attendants, tot_tables, tot_interests, exhibitors_idx, students_idx, static_ex, static_stud)
+        gen.gen_gams_eqns(FILE, eqnfile_path)
+    '''
+
+
 
 #fair = Fair.objects.get(current=True)
 #solver(fair)
