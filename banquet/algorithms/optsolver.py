@@ -84,6 +84,15 @@ class Interest(object):
     def __str__(self):
         return Programme.objects.get(self.id)
 
+def get_gender(attendant_obj):
+    if attendant_obj.gender == 'male':
+        return 1
+    elif attendant_obj.gender == 'female':
+        return 3
+    else:
+        return 2
+
+
 def process_attendants(fair):
     '''
     will return lists of objects for the different types of attendants
@@ -109,8 +118,7 @@ Attendant
         interests = []
         if e.exhibitor.company.related_programme.all():
             interests = [programme.pk for programme in e.exhibitor.company.related_programme.all()]
-
-        exhibitors.append(ExhibitorAttendant(e.pk, interests))
+        exhibitors.append(ExhibitorAttendant(e.pk, interests, get_gender(e)))
         if e.ignore_from_placement:
             exhibitors_static.append(StaticExhibitor(e.pk, e.table.pk))
 
@@ -121,14 +129,13 @@ Attendant
             user = User.objects.get(pk=s.user.pk)
             user_profile = Profile.objects.get(user=user)
             if user_profile.programme:
-                programme_id = user_profile.programme.pk
-                print(programme_id)
+                programme_id = user_profile.programme.pkx
             else:
                 pass
         except:
             pass
 
-        students.append(StudentAttendant(s.pk, programme_id))
+        students.append(StudentAttendant(s.pk, programme_id, get_gender(s)))
         if s.ignore_from_placement:
             students_static.append(StaticStudent(s.pk, s.table.pk))
 
@@ -182,6 +189,16 @@ def gen_static_matrix(rowobjs, colobjs, row_dict, col_dict, offset=0):
             matrix[row_dict[c.table_id]][col_dict[c.id]-offset] = 1
     return(matrix)
 
+def gen_gender_parameter(exhibitors, students, ex_dict, stud_dict):
+    vector = np.zeros(len(exhibitors)+len(students))
+    for e in exhibitors:
+        vector[ex_dict[e.id]] = e.gender
+
+    for s in students:
+        vector[stud_dict[s.id]] = s.gender
+
+    return vector
+
 def main_process(fair):
     '''
     '''
@@ -221,9 +238,7 @@ def main_process(fair):
     ex_static_mat = gen_static_matrix(tables, exhibitors_static, table_idx_dict, exhibitor_idx_dict)
     stud_static_mat = gen_static_matrix(tables, students_static, table_idx_dict, student_idx_dict, len(exhibitors))
 
-    print(stud_static_mat.sum(axis=1))
-
-
+    gender_array = gen_gender_parameter(exhibitors, students, exhibitor_idx_dict, student_idx_dict)
 
 def solver(fair):
     '''
