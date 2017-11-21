@@ -20,12 +20,10 @@ from exhibitors.models import Exhibitor
 from people.models import Programme, Profile
 from banquet.models import BanquetTable, BanquetTicket, BanquetteAttendant
 
-from pprint import pprint
+import pickle
 import math
 from collections import Counter
 import numpy as np
-import cvxopt
-from cvxopt import glpk
 
 from . import gams_generator as gen
 
@@ -211,13 +209,22 @@ def move_statics(exhibitors, exhibitors_static):
     obj_to_move = []
     for idx in idx_to_move:
         obj_to_move.append(exhibitors[idx])
-    print(len(obj_to_move))
     for idx in list(reversed(idx_to_move)):
         exhibitors.pop(idx)
     exhibitors += obj_to_move
-    print(len(exhibitors))
 
     return(exhibitors)
+
+def save_reversed_dict(keys, vals, fname):
+    '''
+    '''
+    rev_dict = dict(zip(vals, keys))
+    with open(fname, 'wb') as FILE:
+        pickle.dump(rev_dict, FILE)
+
+def load_reversed_dict(fname):
+    with open(fname, 'rb') as FILE:
+        return pickle.load(FILE)
 
 def main_process(fair):
     '''
@@ -252,7 +259,7 @@ def main_process(fair):
     stud_static_mat = gen_static_matrix(tables, students_static, table_idx_dict, student_idx_dict, len(exhibitors))
 
     gender_array = gen_gender_parameter(exhibitors, students, exhibitor_idx_dict, student_idx_dict)
-    print(ex_static_mat.sum(axis=1))
+    #print(ex_static_mat.sum(axis=1))
 
     return ( exhibitors, students, exhibitors_static, students_static, interests, tables, exhibitor_idx_dict, student_idx_dict, interest_idx_dict, table_idx_dict, ex_interest_mat, stud_interest_mat, ex_static_mat, stud_static_mat, gender_array )
 
@@ -269,14 +276,27 @@ def solver(fair):
         tot_interests = len(interests) - 1
         exhibitors_idx = [min(exhibitor_idx_dict.values()),max(exhibitor_idx_dict.values())]
         students_idx = [min(student_idx_dict.values()),max(student_idx_dict.values())]
+
         ex_static_indices = [exhibitor_idx_dict[e.id] for e in exhibitors_static]
         stud_static_indices = [student_idx_dict[s.id] for s in students_static]
         static_ex = [min(ex_static_indices),max(ex_static_indices)]
         static_stud = [min(stud_static_indices),max(stud_static_indices)]
         gen.gen_init_strings(FILE, tot_attendants, tot_tables, tot_interests, exhibitors_idx, students_idx, static_ex, static_stud)
+
+        set_ex_numbers = list(sorted(list(exhibitor_idx_dict.values())))
+        set_stud_numbers = list(sorted(list(student_idx_dict.values())))
+        set_exhibitors = ['j%i'%n for n in set_ex_numbers]
+        set_students = ['j%i'%n for n in set_stud_numbers]
+        gen.genGAMS_params(FILE, 'G(j)', set_exhibitors+set_students, gender_array, 'gender of attendants')
+
+        set_interests_numbers = list(sorted(list(interest_idx_dict.values())))
+        set_interests = ['l%i'%n for n in set_interests_numbers]
+        gen.genGAMS_tables_2d(FILE, 'Cs', ['l','js'], set_students, set_interests, stud_interest_mat, 'interest adjecency matrix for students')
+        gen.genGAMS_tables_2d(FILE, 'Ce', ['l','je'], set_exhibitors, set_interests, ex_interest_mat, 'interest adjecency matrix for exhibitors')
+
+        set_tables_numbers = list(sorted(list(table_idx_dict.values())))
+        set_tables = ['k%i'%n for n in set_tables_numbers]
+        gen.genGAMS_tables_2d(FILE, 'StatE', ['k','je'], set_exhibitors, set_tables, ex_static_mat, 'exhibitor attendants with a fixed placement')
+        gen.genGAMS_tables_2d(FILE, 'StatS', ['k','js'], set_students, set_tables, stud_static_mat, 'student attendants with a fixed placement')
+
         gen.gen_gams_eqns(FILE, eqnfile_path)
-
-
-
-#fair = Fair.objects.get(current=True)
-#solver(fair)

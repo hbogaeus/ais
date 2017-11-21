@@ -19,11 +19,60 @@ def gen_init_strings(FILE, tot_attendants, tot_tables, tot_interests, exhibitors
     FILE.write('\n\n')
 
 
-def gen_gams_table_2d(FILE):
-    pass
+def genGAMS_tables_2d(FILE, tabName, sets, colHeaders, rowHeaders, values, helptxt=' ', delimiter='    '):
+    '''
+    Generates a specific gams table by writing it to FILE
 
-def gen_gams_param(FILE):
-    pass
+    Required input:
+    FILE (pointer)      - an opened file pointer to the target .gms file
+    tabName (str)       - the table name
+    sets    (list)      - list of the two sets used (see GAMS doc)
+    colHeaders (list)   - list of strings for the column headers
+    rowHeaders (list)   - list of strings for the row headers
+    values (numpy mat)  - a numpy matrix with the values in the table (for now int)
+
+    Optional input:
+    helptxt (str)       - text describing the table (see GAMS doc)
+    delimiter (str)     - gams is sensitive to blank spaces, control by this
+                          longer row names might need an increased delimiter!
+    '''
+    FILE.write('\nTABLE %s(%s,%s) %s\n'%( tabName, sets[0], sets[1], helptxt )   )
+    FILE.write('%s'%delimiter)
+    for h in colHeaders:
+        FILE.write('%s%s'%(delimiter, h))
+    FILE.write('\n')
+    for i, h in enumerate(rowHeaders):
+        FILE.write('%s%s%s'%(h,(len(delimiter) - len(h) )*' ',delimiter))
+        for j, val in enumerate(values[i]):
+            FILE.write('%i%s%s'%(val, (len(colHeaders[j])-1 )*' ', delimiter    )   )
+            #FILE.write('%i%s'%(val, (len('%s'%h) - len(str(val)))*' ' + delimiter + '  '  ))
+        FILE.write('\n')
+    FILE.write('\n')
+
+def genGAMS_params(FILE, param, set, vals, helptxt, delimiter='    '):
+    ''' generate gams parameters of a certain set, see GAMS doc for instruction
+
+    Required input:
+    FILE (pointer)  - an opened file pointer to a .gms file
+    param (str)    - a string name of sets
+    set (list)      - a list of the set used
+    vals (list)     - a list of integer values (easy to change to float if nec)
+    helptxt (str)   - a string (see GAMS doc)
+
+    Optional input:
+    delimiter (str) - since gams is sensitive on blank spaces, control it here
+    '''
+    FILE.write('\nPARAMETER \t%s %s\n'%(param, helptxt))
+    for i in range(len(set)):
+        if i == 0:
+            FILE.write('   /')
+        else:
+            FILE.write('%s'%delimiter)
+        FILE.write('  %s %i'%(set[i], vals[i]))
+        if i == len(set)-1:
+            FILE.write('  / ;\n')
+        else:
+            FILE.write('\n')
 
 def gen_gams_eqns(FILE, path_opt):
     '''
