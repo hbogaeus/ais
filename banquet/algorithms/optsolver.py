@@ -215,16 +215,12 @@ def move_statics(exhibitors, exhibitors_static):
 
     return(exhibitors)
 
-def save_reversed_dict(keys, vals, fname):
+def save_reversed_dict(vals, keys, fname):
     '''
     '''
     rev_dict = dict(zip(vals, keys))
     with open(fname, 'wb') as FILE:
         pickle.dump(rev_dict, FILE)
-
-def load_reversed_dict(fname):
-    with open(fname, 'rb') as FILE:
-        return pickle.load(FILE)
 
 def main_process(fair):
     '''
@@ -260,6 +256,10 @@ def main_process(fair):
 
     gender_array = gen_gender_parameter(exhibitors, students, exhibitor_idx_dict, student_idx_dict)
     #print(ex_static_mat.sum(axis=1))
+    save_reversed_dict(tables_vals, tables_keys, 'banquet/algorithms/tables.pkl')
+    save_reversed_dict(exhibitors_vals, exhibitors_keys, 'banquet/algorithms/exhibitors.pkl')
+    save_reversed_dict(students_vals, students_keys, 'banquet/algorithms/students.pkl')
+    save_reversed_dict(interests_vals, interests_keys, 'banquet/algorithms/interests.pkl')
 
     return ( exhibitors, students, exhibitors_static, students_static, interests, tables, exhibitor_idx_dict, student_idx_dict, interest_idx_dict, table_idx_dict, ex_interest_mat, stud_interest_mat, ex_static_mat, stud_static_mat, gender_array )
 
@@ -268,7 +268,7 @@ def solver(fair):
     '''
     ( exhibitors, students, exhibitors_static, students_static, interests, tables, exhibitor_idx_dict, student_idx_dict, interest_idx_dict, table_idx_dict, ex_interest_mat, stud_interest_mat, ex_static_mat, stud_static_mat, gender_array ) = main_process(fair)
 
-    outfile_path = 'banquet/algorithms/test.gms'
+    outfile_path = 'banquet/algorithms/NEOSfile.gms'
     eqnfile_path = 'banquet/algorithms/opt_eqn_banquet.gms'
     with open(outfile_path, 'w+') as FILE:
         tot_attendants = len(exhibitors) + len(students) -1

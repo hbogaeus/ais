@@ -12,6 +12,7 @@ from django.contrib.auth.decorators import permission_required
 from django.core.exceptions import PermissionDenied
 #import banquet.functions as func
 from banquet.algorithms import optsolver as opt
+from banquet.algorithms import proc_result
 
 def sit_attendants(request, year):
     '''
@@ -20,7 +21,17 @@ def sit_attendants(request, year):
     '''
     if request.user.has_perm('banquet.can_seat_attendants'):
         fair = get_object_or_404(Fair, year=year)
-        opt.solver(fair)
+        solutionFlag = 0
+        result_path = 'banquet/algorithms/NEOS_result.html'
+        try:
+            with open(result_path, 'r') as FILE:
+                solutionFlag = 1
+        except Exception as e:
+            print(e)
+            opt.solver(fair)
+        if solutionFlag == 1:
+            proc_result.main_process(fair, result_path)
+
         return HttpResponseRedirect(reverse('banquet', kwargs={'year': year }))
     else:
         return HttpResponseForbidden()
