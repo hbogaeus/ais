@@ -15,7 +15,7 @@ def load_reversed_dict(fname):
     with open(fname, 'rb') as FILE:
         return pickle.load(FILE)
 
-def read_results(fname, var='---- VAR x'):
+def read_results(fname, ex_dict, stud_dict, tab_dict, var='---- VAR x'):
     data = []
     wFlag = 0
     readidx = 0
@@ -34,10 +34,20 @@ def read_results(fname, var='---- VAR x'):
                 line_split = lines[i].split()
                 if len(line_split) == 5:
                     if line_split[2] != '.':
-                        print(line_split)
+                        pass
+                        #print(line_split)
                 if len(line_split) == 6:
                     if line_split[3] != '.':
-                        print(line_split)
+                        if line_split[2].startswith('1'):
+                            tab_val = int(line_split[0].strip('.').strip(' ').strip('k'))
+                            att_val = int(line_split[1].strip('.').strip(' ').strip('j'))
+                            try:
+                                attendant_id = ex_dict[att_val]
+                            except:
+                                attendant_id = stud_dict[att_val]
+                            tab_id = tab_dict[tab_val]
+                            ba = BanquetteAttendant.objects.get(pk=attendant_id)
+                            print('%s : %s'%(ba, ba.table.table_name))
 
 
 def main_process(fair, result_path = 'banquet/algorithms/NEOS_result.html'):
@@ -50,4 +60,4 @@ def main_process(fair, result_path = 'banquet/algorithms/NEOS_result.html'):
     exhibitor_dict = load_reversed_dict(exhibitor_path)
     student_dict = load_reversed_dict(student_path)
     interest_dict = load_reversed_dict(interest_path)
-    read_results(result_path)
+    read_results(result_path, exhibitor_dict, student_dict, interest_dict)
