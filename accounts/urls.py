@@ -10,13 +10,13 @@ from django.contrib.auth.views import logout
 app_name = 'accounts'
 
 urlpatterns = [
-    #url(r'^login/$', views.login, name='login'),
-    url(
-        r'^login/$',
-        login,
-        name='login',
-        #kwargs={'template_name': 'accounts/login.html'}
-    ),
+    url(r'^login/$', views.login, name='login'),
+    #url(
+    #    r'^login/$',
+    #    login,
+    #    name='login',
+    #    kwargs={'template_name': 'accounts/login.html'}
+    #),
     url(
         r'^logout/$',
         logout,
