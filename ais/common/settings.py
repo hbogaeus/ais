@@ -32,7 +32,6 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'polymorphic',
-    'django.contrib.sites',
     'events',
     'companies',
     'fair',
@@ -113,8 +112,9 @@ LANGUAGE_CODE = 'en-us'
 
 # SAML and PYSAML settings
 # followed documentation in html file in /docs/saml_html_files/
-#LOGIN_URL = '/saml2/login/'
-LOGIN_REDIRECT_URL = '/'
+LOGIN_URL = '/accounts/login/'
+import datetime
+LOGIN_REDIRECT_URL = '/fairs/' + str(datetime.datetime.now().year) + '/'
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SAML_CREATE_UNKNOWN_USER = True
 SAML_USE_NAME_ID_AS_USERNAME = True
