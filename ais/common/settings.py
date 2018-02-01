@@ -50,6 +50,7 @@ INSTALLED_APPS = (
     'matching',
     'student_profiles',
     'djangosaml2', # SAML, used for KTH Single sign on
+    'transportation',
 )
 
 
